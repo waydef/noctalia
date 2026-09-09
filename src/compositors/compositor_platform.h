@@ -166,6 +166,7 @@ public:
   [[nodiscard]] const char* workspaceBackendName() const noexcept;
 
   [[nodiscard]] bool cycleKeyboardLayout() const;
+  [[nodiscard]] bool resetKeyboardLayout() const;
   [[nodiscard]] bool hasKeyboardLayoutBackend() const noexcept;
   [[nodiscard]] std::optional<KeyboardLayoutState> keyboardLayoutState() const;
   [[nodiscard]] std::string currentKeyboardLayoutName() const;

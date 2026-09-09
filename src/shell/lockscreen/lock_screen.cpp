@@ -7,6 +7,7 @@
 #include "config/config_types.h"
 #include "core/deferred_call.h"
 #include "core/input/key_chord.h"
+#include "core/input/key_symbols.h"
 #include "core/input/keybind_matcher.h"
 #include "core/log.h"
 #include "ext-session-lock-v1-client-protocol.h"
@@ -378,6 +379,17 @@ void LockScreen::onKeyboardEvent(const KeyboardEvent& event) {
     return;
   }
 
+  const bool altShift = ((event.modifiers & KeyMod::Alt) != 0
+                         && (event.sym == XKB_KEY_Shift_L || event.sym == XKB_KEY_Shift_R))
+      || ((event.modifiers & KeyMod::Shift) != 0
+          && (event.sym == XKB_KEY_Alt_L || event.sym == XKB_KEY_Alt_R));
+  const bool superSpace = (event.modifiers & KeyMod::Super) != 0
+      && (event.sym == XKB_KEY_space || event.sym == XKB_KEY_KP_Space);
+  if (altShift || superSpace) {
+    (void)cycleKeyboardLayout();
+    return;
+  }
+
   LockSurface* targetSurface = nullptr;
   if (m_pointerSurface != nullptr) {
     for (auto& instance : m_instances) {
@@ -451,13 +463,6 @@ void LockScreen::handleLocked(void* data, ext_session_lock_v1* /*lock*/) {
   }
   self->m_lockPending = false;
   self->m_locked = true;
-  // Idle status is empty; the surface renders the password hint itself.
-  self->m_status.clear();
-  self->m_statusIsError = false;
-  for (auto& instance : self->m_instances) {
-    instance.surface->setLockedState(true);
-    instance.surface->setOnLogin([self]() { self->tryAuthenticate(); });
-  }
 
   // Start the fallback timer (3 seconds) to trigger suspend anyway if surfaces take too long to render
   self->m_suspendTimeoutTimer.start(std::chrono::seconds(3), [self]() {
@@ -468,6 +473,17 @@ void LockScreen::handleLocked(void* data, ext_session_lock_v1* /*lock*/) {
       DeferredCall::callLater(std::move(pending));
     }
   });
+
+  if (self->m_compositorPlatform != nullptr) {
+    (void)self->m_compositorPlatform->resetKeyboardLayout();
+  }
+  // Idle status is empty; the surface renders the password hint itself.
+  self->m_status.clear();
+  self->m_statusIsError = false;
+  for (auto& instance : self->m_instances) {
+    instance.surface->setLockedState(true);
+    instance.surface->setOnLogin([self]() { self->tryAuthenticate(); });
+  }
 
   self->updatePromptOnSurfaces();
   self->updateIndicatorsOnSurfaces();

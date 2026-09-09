@@ -121,6 +121,10 @@ namespace compositors::hyprland {
       return std::nullopt;
     }
 
+    timeval tv{.tv_sec = 0, .tv_usec = 250000};
+    ::setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+    ::setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+
     sockaddr_un addr{};
     addr.sun_family = AF_UNIX;
     if (m_socketPaths.request.size() >= sizeof(addr.sun_path)) {
