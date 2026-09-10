@@ -1144,19 +1144,25 @@ void WallpaperPanel::rebuildFavoritePaletteDetailSelect(const WallpaperFavorite*
   std::string selectedValue;
 
   if (favorite != nullptr) {
-    const PaletteSource source = favorite->paletteSource.value_or(PaletteSource::Builtin);
+    const PaletteSource fallbackSource =
+        (m_config != nullptr) ? m_config->config().theme.source : PaletteSource::Wallpaper;
+    const PaletteSource source = favorite->paletteSource.value_or(fallbackSource);
     switch (source) {
     case PaletteSource::Builtin:
       for (const auto& builtin : noctalia::theme::builtinPalettes()) {
         m_favoritePaletteDetailValues.emplace_back(builtin.name);
         labels.emplace_back(builtin.name);
       }
-      selectedValue = favorite->builtinPalette;
+      selectedValue = !favorite->builtinPalette.empty()
+          ? favorite->builtinPalette
+          : ((m_config != nullptr) ? m_config->config().theme.builtinPalette : "Noctalia");
       break;
     case PaletteSource::Wallpaper:
       m_favoritePaletteDetailValues = wallpaperSchemeValues();
       labels = wallpaperSchemeOptions();
-      selectedValue = favorite->wallpaperScheme;
+      selectedValue = !favorite->wallpaperScheme.empty()
+          ? favorite->wallpaperScheme
+          : ((m_config != nullptr) ? m_config->config().theme.wallpaperScheme : "vibrant");
       break;
     case PaletteSource::Community:
       for (const auto& community : noctalia::theme::availableCommunityPalettes()) {
@@ -1218,7 +1224,16 @@ WallpaperFavorite WallpaperPanel::activeThemeSettings() const {
   if (m_config != nullptr) {
     if (const std::string path = selectedWallpaperPath(); !path.empty()) {
       if (const WallpaperFavorite* favorite = m_config->wallpaperFavorite(path); favorite != nullptr) {
-        theme = *favorite;
+        if (favorite->themeMode != ThemeMode::Auto) {
+          theme.themeMode = favorite->themeMode;
+        }
+        if (favorite->paletteSource.has_value()) {
+          theme.paletteSource = favorite->paletteSource;
+          theme.builtinPalette = favorite->builtinPalette;
+          theme.communityPalette = favorite->communityPalette;
+          theme.customPalette = favorite->customPalette;
+          theme.wallpaperScheme = favorite->wallpaperScheme;
+        }
       }
     }
   }
@@ -1260,8 +1275,11 @@ void WallpaperPanel::syncThemeControls() {
   m_favoriteThemeSegmented->setSelectedIndex(themeModeSegmentIndex(themeSettings.themeMode));
 
   if (m_favoritePaletteSourceSegmented != nullptr) {
+    const PaletteSource fallbackSource =
+        (m_config != nullptr) ? m_config->config().theme.source : PaletteSource::Wallpaper;
     const std::size_t sourceIndex =
-        themeSettings.paletteSource.has_value() ? segmentForPaletteSource(*themeSettings.paletteSource) : 0;
+        themeSettings.paletteSource.has_value() ? segmentForPaletteSource(*themeSettings.paletteSource)
+                                                : segmentForPaletteSource(fallbackSource);
     m_favoritePaletteSourceSegmented->setSelectedIndex(sourceIndex);
   }
 
@@ -1383,12 +1401,8 @@ void WallpaperPanel::toggleFavoriteForPath(const std::string& path) {
   if (m_config->isWallpaperFavorite(path)) {
     m_config->removeWallpaperFavorite(path);
   } else {
-    std::optional<WallpaperFavorite> preset;
-    const std::string currentPath = currentWallpaperPathForSelection();
-    if (!currentPath.empty()
-        && FileUtils::normalizeWallpaperPath(path) == FileUtils::normalizeWallpaperPath(currentPath)) {
-      preset = wallpaperFavoriteFromTheme(m_config->config().theme);
-    }
+    std::optional<WallpaperFavorite> preset =
+        (m_config != nullptr) ? std::optional{wallpaperFavoriteFromTheme(m_config->config().theme)} : std::nullopt;
     m_config->addWallpaperFavorite(path, preset);
   }
 

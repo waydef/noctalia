@@ -1434,7 +1434,7 @@ constexpr EnumOption<ThemeMode> kThemeModes[] = {
 
 struct WallpaperFavorite {
   std::string path;
-  ThemeMode themeMode = ThemeMode::Auto;
+  ThemeMode themeMode = ThemeMode::Dark;
   std::optional<PaletteSource> paletteSource;
   std::string builtinPalette;
   std::string communityPalette;

@@ -2590,7 +2590,7 @@ void ConfigService::applyWallpaperSelection(
 
   if (applyTheme != nullptr) {
     auto* themeTbl = ensureTable(m_overridesTable, "theme");
-    if (m_config.theme.mode != applyTheme->themeMode) {
+    if (applyTheme->themeMode != ThemeMode::Auto && m_config.theme.mode != applyTheme->themeMode) {
       themeTbl->insert_or_assign("mode", std::string(enumToKey(kThemeModes, applyTheme->themeMode)));
       changed = true;
     }
