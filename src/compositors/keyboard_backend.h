@@ -19,6 +19,8 @@ public:
 
   [[nodiscard]] virtual bool isAvailable() const noexcept = 0;
   [[nodiscard]] virtual bool cycleLayout() const = 0;
+  /// Resets active layout across all keyboards to the primary default layout (index 0).
+  [[nodiscard]] virtual bool resetLayout() const { return false; }
   [[nodiscard]] virtual std::optional<KeyboardLayoutState> layoutState() const = 0;
   [[nodiscard]] virtual std::optional<std::string> currentLayoutName() const = 0;
 

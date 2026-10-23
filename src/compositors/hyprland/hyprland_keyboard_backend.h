@@ -22,6 +22,7 @@ public:
 
   [[nodiscard]] bool isAvailable() const noexcept;
   [[nodiscard]] bool cycleLayout() const;
+  [[nodiscard]] bool resetLayout() const;
   [[nodiscard]] std::optional<KeyboardLayoutState> layoutState() const;
   [[nodiscard]] std::optional<std::string> currentLayoutName() const;
 

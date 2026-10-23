@@ -13,6 +13,8 @@ bool HyprlandKeyboardBackend::isAvailable() const noexcept { return m_runtime.av
 
 bool HyprlandKeyboardBackend::cycleLayout() const { return m_runtime.request("switchxkblayout all next").has_value(); }
 
+bool HyprlandKeyboardBackend::resetLayout() const { return m_runtime.request("switchxkblayout all 0").has_value(); }
+
 std::optional<KeyboardLayoutState> HyprlandKeyboardBackend::layoutState() const {
   const auto current = currentLayoutName();
   if (!current.has_value()) {

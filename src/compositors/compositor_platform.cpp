@@ -280,6 +280,12 @@ namespace {
 
     [[nodiscard]] bool isAvailable() const noexcept override { return m_backend.isAvailable(); }
     [[nodiscard]] bool cycleLayout() const override { return m_backend.cycleLayout(); }
+    [[nodiscard]] bool resetLayout() const override {
+      if constexpr (requires { m_backend.resetLayout(); }) {
+        return m_backend.resetLayout();
+      }
+      return false;
+    }
     [[nodiscard]] std::optional<KeyboardLayoutState> layoutState() const override { return m_backend.layoutState(); }
     [[nodiscard]] std::optional<std::string> currentLayoutName() const override {
       return m_backend.currentLayoutName();
@@ -1571,6 +1577,10 @@ void CompositorPlatform::activateKdeWindow(
 
 bool CompositorPlatform::cycleKeyboardLayout() const {
   return m_keyboardLayoutBackend != nullptr && m_keyboardLayoutBackend->cycleLayout();
+}
+
+bool CompositorPlatform::resetKeyboardLayout() const {
+  return m_keyboardLayoutBackend != nullptr && m_keyboardLayoutBackend->resetLayout();
 }
 
 bool CompositorPlatform::hasKeyboardLayoutBackend() const noexcept {
