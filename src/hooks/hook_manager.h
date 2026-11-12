@@ -6,6 +6,7 @@
 #include <initializer_list>
 #include <span>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -25,7 +26,7 @@ public:
   [[nodiscard]] const HooksConfig& config() const noexcept { return m_config; }
 
 private:
-  [[nodiscard]] bool fireWithRunner(HookKind kind, const CommandRunner& runner) const;
+  [[nodiscard]] bool fireWithRunner(HookKind kind, const CommandRunner& runner, std::string_view envPrefix = {}) const;
   void fireWithEnv(HookKind kind, std::span<const EnvVar> env) const;
 
   HooksConfig m_config;
