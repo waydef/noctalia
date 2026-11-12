@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <string_view>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/un.h>
 #include <unistd.h>
@@ -75,9 +76,6 @@ bool IpcService::start() {
     return false;
   }
 
-  // Remove stale socket file before binding
-  ::unlink(m_socketPath.c_str());
-
   sockaddr_un addr{};
   addr.sun_family = AF_UNIX;
   if (m_socketPath.size() >= sizeof(addr.sun_path)) {
@@ -87,11 +85,27 @@ bool IpcService::start() {
   }
   std::memcpy(addr.sun_path, m_socketPath.c_str(), m_socketPath.size() + 1);
 
+  // Remove only a stale socket file: if something answers on it, another instance owns it
+  if (const int probe = ::socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0); probe >= 0) {
+    const bool live = ::connect(probe, reinterpret_cast<const sockaddr*>(&addr), sizeof(addr)) == 0;
+    ::close(probe);
+    if (live) {
+      kLog.warn("IPC disabled: {} is in use by another instance", m_socketPath);
+      ::close(fd);
+      m_socketPath.clear();
+      return false;
+    }
+  }
+  ::unlink(m_socketPath.c_str());
+
   if (::bind(fd, reinterpret_cast<const sockaddr*>(&addr), sizeof(addr)) < 0) {
     kLog.warn("IPC disabled: bind() failed: {}", std::strerror(errno));
     ::close(fd);
     return false;
   }
+
+  // the socket accepts commands, so only the owner may connect, whatever the umask
+  ::chmod(m_socketPath.c_str(), S_IRUSR | S_IWUSR);
 
   if (::listen(fd, 128) < 0) {
     kLog.warn("IPC disabled: listen() failed: {}", std::strerror(errno));
@@ -164,6 +178,13 @@ void IpcService::dispatch() {
     const int connFd = ::accept4(m_listenFd, nullptr, nullptr, SOCK_CLOEXEC);
     if (connFd < 0) {
       break; // EAGAIN / EWOULDBLOCK — no more pending connections
+    }
+    ucred peer{};
+    socklen_t peerLen = sizeof(peer);
+    if (::getsockopt(connFd, SOL_SOCKET, SO_PEERCRED, &peer, &peerLen) != 0 || peer.uid != ::getuid()) {
+      kLog.warn("IPC: refused a connection from uid {}", peer.uid);
+      ::close(connFd);
+      continue;
     }
     handleConnection(connFd);
     ::close(connFd);
@@ -314,9 +335,10 @@ std::string IpcService::executeParsed(const std::string& command, const std::str
 }
 
 std::string IpcService::resolveSocketPath() {
+  // without a per-user runtime dir there is no private place for the socket; the shared /tmp is not one
   const char* runtime = std::getenv("XDG_RUNTIME_DIR");
   if (runtime == nullptr || runtime[0] == '\0') {
-    runtime = "/tmp";
+    return {};
   }
   const char* display = std::getenv("WAYLAND_DISPLAY");
   if (display == nullptr || display[0] == '\0') {
