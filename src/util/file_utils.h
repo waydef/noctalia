@@ -16,6 +16,19 @@
 
 namespace FileUtils {
 
+  // Per-user cache directory: $XDG_CACHE_HOME/noctalia/<sub>, else ~/.cache/noctalia/<sub>. Downloads go here
+  // rather than to fixed names in the shared /tmp, where another user could pre-create the directory, and
+  // where a big download eats RAM when /tmp is tmpfs.
+  [[nodiscard]] inline std::filesystem::path userCacheDir(std::string_view sub) {
+    if (const char* xdg = std::getenv("XDG_CACHE_HOME"); xdg != nullptr && xdg[0] != '\0') {
+      return std::filesystem::path(xdg) / "noctalia" / sub;
+    }
+    if (const char* home = std::getenv("HOME"); home != nullptr && home[0] != '\0') {
+      return std::filesystem::path(home) / ".cache" / "noctalia" / sub;
+    }
+    return std::filesystem::path("/tmp") / "noctalia" / sub;
+  }
+
   [[nodiscard]] constexpr std::filesystem::perms privateFileMode() {
     return std::filesystem::perms::owner_read | std::filesystem::perms::owner_write;
   }

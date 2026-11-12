@@ -6,6 +6,8 @@
 #include <cctype>
 #include <chrono>
 #include <cstdio>
+#include <fcntl.h>
+#include <unistd.h>
 #include <filesystem>
 #include <string>
 #include <utility>
@@ -16,6 +18,9 @@ namespace {
   constexpr float kSlowCurlOperationWarnMs = 1000.0F;
   constexpr float kCurlServiceGapWarnMs = 5000.0F;
   constexpr const char* kUserAgent = "noctalia/" NOCTALIA_VERSION;
+  // upper bound for one download (images, json, template files, plugin fetches); the 30 s timeout alone
+  // still let a fast link write hundreds of megabytes
+  constexpr long long kMaxDownloadBytes = 64LL * 1024 * 1024;
 
   float elapsedSince(std::chrono::steady_clock::time_point start) {
     return std::chrono::duration<float, std::milli>(std::chrono::steady_clock::now() - start).count();
@@ -201,7 +206,13 @@ void HttpClient::download(std::string_view url, const std::filesystem::path& des
 
   const auto tempPath = destPath.parent_path() / (destPath.filename().string() + ".part");
 
-  FILE* f = std::fopen(tempPath.c_str(), "wb");
+  // a fresh file, never through a symlink someone left at the .part name
+  ::unlink(tempPath.c_str());
+  const int fd = ::open(tempPath.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
+  FILE* f = fd >= 0 ? ::fdopen(fd, "wb") : nullptr;
+  if (f == nullptr && fd >= 0) {
+    ::close(fd);
+  }
   if (f == nullptr) {
     kLog.warn("download failed to open temp file {} for url={}", tempPath.string(), urlForLog(url));
     deferFailure(std::move(cb));
@@ -225,6 +236,8 @@ void HttpClient::download(std::string_view url, const std::filesystem::path& des
   curl_easy_setopt(easy, CURLOPT_FAILONERROR, 1L);
   curl_easy_setopt(easy, CURLOPT_TIMEOUT, 30L);
   curl_easy_setopt(easy, CURLOPT_CONNECTTIMEOUT, 10L);
+  // album art, notification icons and json: a url that points at something huge must not fill the disk
+  curl_easy_setopt(easy, CURLOPT_MAXFILESIZE_LARGE, static_cast<curl_off_t>(kMaxDownloadBytes));
 
   Transfer transfer{};
   transfer.destPath = destPath;
